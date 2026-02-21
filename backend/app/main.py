@@ -5,6 +5,8 @@ from sqlalchemy import text
 
 from app.core.database import engine
 from app.routes.auth_routes import router as auth_router
+from app.routes.resume_routes import router as resume_router
+from app.routes.user_routes import router as user_router
 
 
 @asynccontextmanager
@@ -25,6 +27,8 @@ app = FastAPI(
 )
 
 app.include_router(auth_router)
+app.include_router(user_router)
+app.include_router(resume_router)
 
 
 @app.get("/health")
