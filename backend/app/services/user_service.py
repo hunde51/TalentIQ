@@ -24,6 +24,7 @@ async def signup_user(payload: SignupRequest, db: AsyncSession) -> TokenResponse
     user = User(
         email=payload.email.lower(),
         hashed_password=hash_password(payload.password),
+        role="job_seeker",
         verification_token=secrets.token_urlsafe(32),
     )
     db.add(user)
