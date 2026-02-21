@@ -36,6 +36,23 @@ class Settings:
         self.access_token_expire_minutes = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
         self.refresh_token_expire_days = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
         self.ai_api_key = os.getenv("AI_API_KEY", "")
+        self.storage_backend = os.getenv("STORAGE_BACKEND", "local").lower()
+        self.resume_upload_dir = os.getenv("RESUME_UPLOAD_DIR", str(BASE_DIR / "storage" / "resumes"))
+        self.max_resume_file_size = int(os.getenv("MAX_RESUME_FILE_SIZE", str(5 * 1024 * 1024)))
+        self.allowed_resume_content_types = {
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        }
+        self.s3_bucket_name = os.getenv("S3_BUCKET_NAME", "")
+        self.aws_region = os.getenv("AWS_REGION", "us-east-1")
+        self.aws_access_key_id = os.getenv("AWS_ACCESS_KEY_ID", "")
+        self.aws_secret_access_key = os.getenv("AWS_SECRET_ACCESS_KEY", "")
+        self.celery_broker_url = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
+        self.celery_result_backend = os.getenv("CELERY_RESULT_BACKEND", self.celery_broker_url)
+
+        if self.storage_backend not in {"local", "s3"}:
+            raise ValueError("STORAGE_BACKEND must be either 'local' or 's3'")
 
 
 @lru_cache
