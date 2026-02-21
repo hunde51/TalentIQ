@@ -1,4 +1,12 @@
+from enum import Enum
+
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+
+class UserRole(str, Enum):
+    job_seeker = "job_seeker"
+    recruiter = "recruiter"
+    admin = "admin"
 
 
 class SignupRequest(BaseModel):
@@ -34,5 +42,6 @@ class UserResponse(BaseModel):
 
     id: str
     email: EmailStr
+    role: UserRole
     is_active: bool
     is_verified: bool

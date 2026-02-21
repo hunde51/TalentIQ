@@ -7,6 +7,7 @@ from app.schemas.auth_schema import (
     UserResponse,
     VerifyEmailRequest,
 )
+from app.schemas.resume_schema import ResumeResponse, ResumeUploadResponse
 
 __all__ = [
     "SignupRequest",
@@ -16,4 +17,6 @@ __all__ = [
     "VerifyEmailRequest",
     "MessageResponse",
     "UserResponse",
+    "ResumeUploadResponse",
+    "ResumeResponse",
 ]
