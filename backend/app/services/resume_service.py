@@ -1,11 +1,15 @@
 from pathlib import Path
 from uuid import uuid4
+
 from fastapi import HTTPException, UploadFile, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.models.resume_model import Resume
+from app.models.resume_parse_model import ResumeParseResult
 from app.models.user_model import User
+from app.schemas.resume_parse_schema import ResumeParseResultResponse
 from app.schemas.resume_schema import ResumeUploadResponse
 from app.tasks import enqueue_resume_processing
 
@@ -70,6 +74,38 @@ async def upload_resume(file: UploadFile, current_user: User, db: AsyncSession) 
         file_size=resume.file_size,
         processing_status=resume.processing_status,
         processing_task_id=resume.processing_task_id,
+    )
+
+
+async def get_my_resume_parse_result(
+    resume_id: str,
+    current_user: User,
+    db: AsyncSession,
+) -> ResumeParseResultResponse:
+    resume = await db.scalar(select(Resume).where(Resume.id == resume_id, Resume.user_id == current_user.id))
+    if not resume:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found")
+
+    parsed = await db.scalar(select(ResumeParseResult).where(ResumeParseResult.resume_id == resume.id))
+    if not parsed:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume parse result not found yet")
+
+    # Normalize persisted JSON to avoid validation/runtime issues from legacy rows.
+    skills = [str(item) for item in (parsed.skills or []) if item is not None]
+    experience = [str(item) for item in (parsed.experience or []) if item is not None]
+    education = [str(item) for item in (parsed.education or []) if item is not None]
+    entities = [item for item in (parsed.entities or []) if isinstance(item, dict)]
+
+    return ResumeParseResultResponse(
+        id=parsed.id,
+        resume_id=parsed.resume_id,
+        skills=skills,
+        experience=experience,
+        education=education,
+        entities=entities,
+        parser_source=parsed.parser_source,
+        created_at=parsed.created_at,
+        updated_at=parsed.updated_at,
     )
 
 
