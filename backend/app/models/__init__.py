@@ -1,4 +1,5 @@
+from app.models.resume_parse_model import ResumeParseResult
 from app.models.resume_model import Resume
 from app.models.user_model import User
 
-__all__ = ["User", "Resume"]
+__all__ = ["User", "Resume", "ResumeParseResult"]
