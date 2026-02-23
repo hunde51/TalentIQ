@@ -19,11 +19,16 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def create_access_token(subject: str, extra: dict[str, Any] | None = None) -> str:
+def create_access_token(
+    subject: str,
+    extra: dict[str, Any] | None = None,
+    expires_minutes: int | None = None,
+) -> str:
+    ttl_minutes = expires_minutes if expires_minutes is not None else settings.access_token_expire_minutes
     payload: dict[str, Any] = {
         "sub": subject,
         "type": "access",
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes),
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes),
     }
     if extra:
         payload.update(extra)
