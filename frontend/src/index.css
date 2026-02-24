@@ -76,13 +76,21 @@
     --secondary-foreground: 220 20% 93%;
     --muted: 230 18% 18%;
     --muted-foreground: 220 10% 55%;
-    --accent: 173 58% 45%;
+    --accent: 152 64% 56%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 230 18% 20%;
-    --input: 230 18% 20%;
+    --border: 152 52% 34%;
+    --input: 152 44% 28%;
     --ring: 234 62% 55%;
+
+    --shadow-card: 0 3px 10px 0 hsl(152 95% 64% / 0.14), 0 3px 6px -1px hsl(152 95% 64% / 0.12);
+    --shadow-elevated: 0 14px 34px -10px hsl(152 95% 64% / 0.34), 0 5px 14px -2px hsl(152 95% 64% / 0.28);
+    --shadow-modal: 0 28px 46px -12px hsl(152 95% 64% / 0.44), 0 14px 20px -8px hsl(152 95% 64% / 0.28);
+  }
+
+  .dark tbody tr.border-b {
+    border-color: hsl(0 0% 100% / 0.24);
   }
 }
 
