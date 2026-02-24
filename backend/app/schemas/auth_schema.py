@@ -1,6 +1,6 @@
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 
 class UserRole(str, Enum):
@@ -10,13 +10,24 @@ class UserRole(str, Enum):
 
 
 class SignupRequest(BaseModel):
+    username: str = Field(min_length=3, max_length=50)
+    name: str = Field(min_length=2, max_length=120)
+    sex: str = Field(min_length=1, max_length=20)
+    age: int = Field(ge=13, le=120)
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    username: str | None = Field(default=None, min_length=3, max_length=50)
+    email: EmailStr | None = None
     password: str = Field(min_length=8, max_length=128)
+
+    @model_validator(mode="after")
+    def validate_identifier(self) -> "LoginRequest":
+        if not self.username and not self.email:
+            raise ValueError("Either username or email is required")
+        return self
 
 
 class TokenResponse(BaseModel):
@@ -41,6 +52,10 @@ class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+    username: str
+    name: str
+    sex: str
+    age: int
     email: EmailStr
     role: UserRole
     is_active: bool
