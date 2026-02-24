@@ -41,6 +41,10 @@ async def get_current_user(
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user")
 
+    token_version = claims.get("token_version")
+    if token_version is not None and int(token_version) != int(user.token_version):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired")
+
     return user
 
 
@@ -51,3 +55,8 @@ def require_roles(*roles: str) -> Callable[[User], User]:
         return current_user
 
     return role_checker
+
+
+def require_admin(current_user: User = Depends(require_roles("admin"))) -> User:
+    # Example explicit role-check dependency for admin-only routes.
+    return current_user
