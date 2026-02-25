@@ -9,6 +9,8 @@ class ChatMessageResponse(BaseModel):
     id: str
     application_id: str
     sender_id: str
+    sender_name: str | None = None
+    sender_username: str | None = None
     content: str
     created_at: datetime
 
@@ -22,7 +24,11 @@ class ChatRoomItem(BaseModel):
     job_id: str
     job_title: str
     applicant_id: str
+    applicant_name: str | None = None
+    applicant_username: str | None = None
     recruiter_id: str
+    recruiter_name: str | None = None
+    recruiter_username: str | None = None
 
 
 class ChatRoomListResponse(BaseModel):
