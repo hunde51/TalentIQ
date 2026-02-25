@@ -21,7 +21,14 @@ async def list_users(
         filters.append(User.is_active == is_active)
     if q:
         pattern = f"%{q.strip()}%"
-        filters.append(or_(User.email.ilike(pattern), User.id.ilike(pattern)))
+        filters.append(
+            or_(
+                User.email.ilike(pattern),
+                User.id.ilike(pattern),
+                User.username.ilike(pattern),
+                User.name.ilike(pattern),
+            )
+        )
 
     total_stmt = select(func.count()).select_from(User)
     if filters:
