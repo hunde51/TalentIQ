@@ -12,9 +12,8 @@ from app.schemas.search_schema import (
     SearchResumeItem,
     SearchResumesResponse,
 )
+from app.services.embedding_service import generate_embeddings
 
-_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-_EMBEDDER = None
 _NUMPY = None
 
 
@@ -25,15 +24,6 @@ def _get_numpy():
 
         _NUMPY = np
     return _NUMPY
-
-
-def _get_embedder():
-    global _EMBEDDER
-    if _EMBEDDER is None:
-        from sentence_transformers import SentenceTransformer
-
-        _EMBEDDER = SentenceTransformer(_MODEL)
-    return _EMBEDDER
 
 
 def _sim(a, b) -> float:
@@ -61,10 +51,10 @@ async def search_jobs(
             return SearchJobsResponse(query=query, semantic=True, page=page, size=size, total=0, items=[])
 
         np = _get_numpy()
-        model = _get_embedder()
-        qv = np.array(model.encode(query, normalize_embeddings=True), dtype=np.float32)
         texts = [f"{j.title} {j.description} {' '.join(j.skills)} {j.location}" for j in jobs]
-        vecs = np.array(model.encode(texts, normalize_embeddings=True), dtype=np.float32)
+        vectors = await generate_embeddings([query, *texts])
+        qv = np.array(vectors[0], dtype=np.float32)
+        vecs = np.array(vectors[1:], dtype=np.float32)
 
         scored = sorted(
             ((job, _sim(qv, v)) for job, v in zip(jobs, vecs, strict=False)),
@@ -122,13 +112,13 @@ async def search_resumes(
 
     if semantic:
         np = _get_numpy()
-        model = _get_embedder()
-        qv = np.array(model.encode(query, normalize_embeddings=True), dtype=np.float32)
         texts = [
             f"skills: {' '.join((p.skills or []))}; experience: {' '.join((p.experience or []))}; education: {' '.join((p.education or []))}"
             for _, p in rows
         ]
-        vecs = np.array(model.encode(texts, normalize_embeddings=True), dtype=np.float32)
+        vectors = await generate_embeddings([query, *texts])
+        qv = np.array(vectors[0], dtype=np.float32)
+        vecs = np.array(vectors[1:], dtype=np.float32)
         scored = sorted(
             ((pair, _sim(qv, v)) for pair, v in zip(rows, vecs, strict=False)),
             key=lambda x: x[1],
