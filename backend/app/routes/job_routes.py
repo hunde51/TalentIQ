@@ -29,9 +29,18 @@ async def get_job_list(
     skill: str | None = Query(default=None),
     location: str | None = Query(default=None),
     q: str | None = Query(default=None),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> JobListResponse:
-    return await list_jobs(db=db, page=page, size=size, skill=skill, location=location, q=q)
+    return await list_jobs(
+        db=db,
+        current_user=current_user,
+        page=page,
+        size=size,
+        skill=skill,
+        location=location,
+        q=q,
+    )
 
 
 @router.post("/match", response_model=JobMatchResponse)

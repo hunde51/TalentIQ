@@ -56,6 +56,9 @@ async def _get_user_from_token(db: AsyncSession, token: str) -> User:
     user = await db.scalar(select(User).where(User.id == user_id))
     if not user or not user.is_active:
         raise ValueError("User not found or inactive")
+    token_version = claims.get("token_version")
+    if token_version is not None and int(token_version) != int(user.token_version):
+        raise ValueError("Session expired")
     return user
 
 
@@ -76,7 +79,23 @@ async def get_chat_messages(
 ) -> list[ChatMessageResponse]:
     await ensure_chat_access(db=db, current_user=current_user, application_id=application_id)
     rows = await list_messages(db=db, application_id=application_id)
-    return [ChatMessageResponse.model_validate(item) for item in rows]
+    sender_ids = {item.sender_id for item in rows}
+    users = (
+        await db.scalars(select(User).where(User.id.in_(sender_ids)))
+    ).all() if sender_ids else []
+    by_id = {user.id: user for user in users}
+    return [
+        ChatMessageResponse(
+            id=item.id,
+            application_id=item.application_id,
+            sender_id=item.sender_id,
+            sender_name=by_id.get(item.sender_id).name if by_id.get(item.sender_id) else None,
+            sender_username=by_id.get(item.sender_id).username if by_id.get(item.sender_id) else None,
+            content=item.content,
+            created_at=item.created_at,
+        )
+        for item in rows
+    ]
 
 
 @router.post("/{application_id}/messages", response_model=ChatMessageResponse)
@@ -88,14 +107,23 @@ async def post_chat_message(
 ) -> ChatMessageResponse:
     await ensure_chat_access(db=db, current_user=current_user, application_id=application_id)
     message = await create_message(db=db, application_id=application_id, sender_id=current_user.id, content=payload.content)
+    response = ChatMessageResponse(
+        id=message.id,
+        application_id=message.application_id,
+        sender_id=message.sender_id,
+        sender_name=current_user.name,
+        sender_username=current_user.username,
+        content=message.content,
+        created_at=message.created_at,
+    )
     await manager.broadcast(
         application_id,
         {
             "event": "message",
-            "message": ChatMessageResponse.model_validate(message).model_dump(mode="json"),
+            "message": response.model_dump(mode="json"),
         },
     )
-    return ChatMessageResponse.model_validate(message)
+    return response
 
 
 @router.websocket("/ws/{application_id}")
@@ -124,7 +152,16 @@ async def chat_ws(websocket: WebSocket, application_id: str, token: str = Query(
                     content=content,
                 )
                 await db.commit()
-                payload = ChatMessageResponse.model_validate(message).model_dump(mode="json")
+                sender = await db.scalar(select(User).where(User.id == message.sender_id))
+                payload = ChatMessageResponse(
+                    id=message.id,
+                    application_id=message.application_id,
+                    sender_id=message.sender_id,
+                    sender_name=sender.name if sender else None,
+                    sender_username=sender.username if sender else None,
+                    content=message.content,
+                    created_at=message.created_at,
+                ).model_dump(mode="json")
 
             await manager.broadcast(application_id, {"event": "message", "message": payload})
     except WebSocketDisconnect:
