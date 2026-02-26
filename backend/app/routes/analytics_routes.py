@@ -14,7 +14,7 @@ router = APIRouter(prefix="/analytics", tags=["analytics"])
 @router.get("", response_model=AnalyticsResponse)
 async def analytics(
     top_skills: int = Query(default=10, ge=1, le=50),
-    _: User = Depends(require_roles("recruiter", "admin")),
+    current_user: User = Depends(require_roles("recruiter", "admin")),
     db: AsyncSession = Depends(get_db),
 ) -> AnalyticsResponse:
-    return await get_analytics(db=db, top_skills=top_skills)
+    return await get_analytics(db=db, current_user=current_user, top_skills=top_skills)
