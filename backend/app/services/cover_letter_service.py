@@ -8,6 +8,7 @@ from app.models.resume_model import Resume
 from app.models.resume_parse_model import ResumeParseResult
 from app.models.user_model import User
 from app.schemas.cover_letter_schema import CoverLetterGenerateRequest, CoverLetterResponse
+from app.services.resume_parser_service import parse_resume_file
 
 settings = get_settings()
 
@@ -23,7 +24,7 @@ async def generate_cover_letter(
 
     parsed = await db.scalar(select(ResumeParseResult).where(ResumeParseResult.resume_id == resume.id))
     if not parsed:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume parse result not found yet")
+        parsed = await _parse_resume_on_demand(resume=resume, db=db)
 
     generated_text, source = _generate_text(parsed, payload.job_description)
 
@@ -38,6 +39,31 @@ async def generate_cover_letter(
     await db.flush()
 
     return CoverLetterResponse.model_validate(entity)
+
+
+async def _parse_resume_on_demand(resume: Resume, db: AsyncSession) -> ResumeParseResult:
+    existing = await db.scalar(select(ResumeParseResult).where(ResumeParseResult.resume_id == resume.id))
+    if existing:
+        return existing
+
+    try:
+        parsed_payload = parse_resume_file(resume.file_path)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to parse resume")
+
+    entity = ResumeParseResult(
+        resume_id=resume.id,
+        skills=parsed_payload["skills"],
+        experience=parsed_payload["experience"],
+        education=parsed_payload["education"],
+        entities=parsed_payload["entities"],
+        parser_source=parsed_payload["parser_source"],
+    )
+    db.add(entity)
+    resume.processing_status = "parsed"
+    resume.processing_task_id = None
+    await db.flush()
+    return entity
 
 
 def _generate_text(parsed: ResumeParseResult, job_description: str) -> tuple[str, str]:
