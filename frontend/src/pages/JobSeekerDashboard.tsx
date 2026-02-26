@@ -145,8 +145,7 @@ const JobSeekerDashboard = () => {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30">
-                <th className="text-left px-5 py-3 font-medium text-muted-foreground">Application ID</th>
-                <th className="text-left px-5 py-3 font-medium text-muted-foreground">Job ID</th>
+                <th className="text-left px-5 py-3 font-medium text-muted-foreground">Job</th>
                 <th className="text-left px-5 py-3 font-medium text-muted-foreground">Applied</th>
                 <th className="text-left px-5 py-3 font-medium text-muted-foreground">Status</th>
               </tr>
@@ -154,8 +153,7 @@ const JobSeekerDashboard = () => {
             <tbody>
               {applications.map((app) => (
                 <tr key={app.id} className="table-row-hover border-b border-border last:border-0">
-                  <td className="px-5 py-3 font-medium text-foreground font-mono text-xs">{app.id}</td>
-                  <td className="px-5 py-3 text-muted-foreground font-mono text-xs">{app.job_id}</td>
+                  <td className="px-5 py-3 text-muted-foreground">{app.job_title || app.job_id}</td>
                   <td className="px-5 py-3 text-muted-foreground">{new Date(app.created_at).toLocaleDateString()}</td>
                   <td className="px-5 py-3"><StatusBadge status={app.status} /></td>
                 </tr>
