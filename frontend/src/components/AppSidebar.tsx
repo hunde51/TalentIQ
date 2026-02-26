@@ -6,18 +6,21 @@ import {
   FileText,
   Briefcase,
   Mail,
+  MessageSquare,
   Upload,
   Users,
   ClipboardList,
   PlusCircle,
   BarChart3,
   Shield,
+  Settings,
   LogOut,
   ChevronLeft,
   ChevronRight,
   Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const sidebarLinks = {
   job_seeker: [
@@ -26,18 +29,24 @@ const sidebarLinks = {
     { to: "/resume", icon: Upload, label: "Resume" },
     { to: "/cover-letter", icon: Mail, label: "Cover Letter" },
     { to: "/applications", icon: ClipboardList, label: "Applications" },
+    { to: "/chat", icon: MessageSquare, label: "Chat" },
+    { to: "/settings", icon: Settings, label: "Settings" },
   ],
   recruiter: [
     { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/post-job", icon: PlusCircle, label: "Post Job" },
     { to: "/applicants", icon: Users, label: "Applicants" },
     { to: "/analytics", icon: BarChart3, label: "Analytics" },
+    { to: "/chat", icon: MessageSquare, label: "Chat" },
+    { to: "/settings", icon: Settings, label: "Settings" },
   ],
   admin: [
-    { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+    { to: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { to: "/users", icon: Users, label: "Users" },
     { to: "/analytics", icon: BarChart3, label: "Analytics" },
     { to: "/audit-log", icon: Shield, label: "Audit Log" },
+    { to: "/chat", icon: MessageSquare, label: "Chat" },
+    { to: "/settings", icon: Settings, label: "Settings" },
   ],
 };
 
@@ -90,6 +99,7 @@ const AppSidebar = () => {
 
       {/* Footer */}
       <div className="p-2 border-t border-sidebar-border space-y-1">
+        <ThemeToggle collapsed={collapsed} />
         <button
           onClick={logout}
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-destructive transition-colors w-full"

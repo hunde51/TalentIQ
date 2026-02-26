@@ -1,11 +1,12 @@
-import React, { createContext, useContext, useState, ReactNode } from "react";
-import { UserRole, User, mockCurrentUser } from "@/data/mockData";
+import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { api, tokenStorage, type ApiUser, type SignupRole, type UserRole } from "@/lib/api";
 
 interface AuthContextType {
-  user: User | null;
+  user: ApiUser | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string, role: UserRole) => void;
-  signup: (name: string, email: string, password: string, role: UserRole) => void;
+  isLoadingAuth: boolean;
+  login: (identifier: string, password: string) => Promise<void>;
+  signup: (payload: { username: string; name: string; sex: string; age: number; email: string; password: string; role: SignupRole }) => Promise<void>;
   logout: () => void;
 }
 
@@ -17,22 +18,72 @@ export const useAuth = () => {
   return ctx;
 };
 
+async function bootstrapSession(): Promise<ApiUser | null> {
+  if (!tokenStorage.hasAccessToken()) return null;
+
+  try {
+    return await api.me();
+  } catch {
+    const refreshToken = tokenStorage.getRefreshToken();
+    if (!refreshToken) {
+      tokenStorage.clear();
+      return null;
+    }
+
+    try {
+      const tokens = await api.refresh(refreshToken);
+      tokenStorage.save(tokens);
+      return await api.me();
+    } catch {
+      tokenStorage.clear();
+      return null;
+    }
+  }
+}
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<ApiUser | null>(null);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
-  const login = (_email: string, _password: string, role: UserRole) => {
-    setUser({ ...mockCurrentUser, role });
+  useEffect(() => {
+    let mounted = true;
+
+    bootstrapSession().then((sessionUser) => {
+      if (mounted) {
+        setUser(sessionUser);
+        setIsLoadingAuth(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const login = async (identifier: string, password: string) => {
+    const tokens = await api.login(identifier, password);
+    tokenStorage.save(tokens);
+    const me = await api.me();
+    setUser(me);
   };
 
-  const signup = (name: string, email: string, _password: string, role: UserRole) => {
-    setUser({ ...mockCurrentUser, name, email, role, id: "u-new" });
+  const signup = async (payload: { username: string; name: string; sex: string; age: number; email: string; password: string; role: SignupRole }) => {
+    const tokens = await api.signup(payload);
+    tokenStorage.save(tokens);
+    const me = await api.me();
+    setUser(me);
   };
 
-  const logout = () => setUser(null);
+  const logout = () => {
+    tokenStorage.clear();
+    setUser(null);
+  };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoadingAuth, login, signup, logout }}>
       {children}
     </AuthContext.Provider>
   );
 };
+
+export type { UserRole };
