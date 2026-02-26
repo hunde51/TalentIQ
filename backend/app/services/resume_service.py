@@ -11,6 +11,7 @@ from app.models.resume_parse_model import ResumeParseResult
 from app.models.user_model import User
 from app.schemas.resume_parse_schema import ResumeParseResultResponse
 from app.schemas.resume_schema import ResumeUploadResponse
+from app.services.resume_parser_service import parse_resume_file
 from app.tasks import enqueue_resume_processing
 
 settings = get_settings()
@@ -62,6 +63,9 @@ async def upload_resume(file: UploadFile, current_user: User, db: AsyncSession) 
     if task_id:
         resume.processing_status = "queued"
         resume.processing_task_id = task_id
+    else:
+        # Fallback path for environments without Celery/Redis.
+        await _parse_resume_now(resume, db)
 
     await db.flush()
 
@@ -106,6 +110,60 @@ async def get_my_resume_parse_result(
         parser_source=parsed.parser_source,
         created_at=parsed.created_at,
         updated_at=parsed.updated_at,
+    )
+
+
+async def get_my_latest_resume(
+    current_user: User,
+    db: AsyncSession,
+) -> ResumeUploadResponse:
+    resume = await db.scalar(
+        select(Resume).where(Resume.user_id == current_user.id).order_by(Resume.created_at.desc())
+    )
+    if not resume:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No resume uploaded")
+
+    return ResumeUploadResponse(
+        id=resume.id,
+        original_filename=resume.original_filename,
+        file_path=resume.file_path,
+        storage_backend=resume.storage_backend,
+        content_type=resume.content_type,
+        file_size=resume.file_size,
+        processing_status=resume.processing_status,
+        processing_task_id=resume.processing_task_id,
+    )
+
+
+async def _parse_resume_now(resume: Resume, db: AsyncSession) -> None:
+    try:
+        resume.processing_status = "processing"
+        parsed = parse_resume_file(resume.file_path)
+        resume.processing_status = "parsed"
+        resume.processing_task_id = None
+    except Exception:
+        resume.processing_status = "failed"
+        resume.processing_task_id = None
+        return
+
+    existing = await db.scalar(select(ResumeParseResult).where(ResumeParseResult.resume_id == resume.id))
+    if existing:
+        existing.skills = parsed["skills"]
+        existing.experience = parsed["experience"]
+        existing.education = parsed["education"]
+        existing.entities = parsed["entities"]
+        existing.parser_source = parsed["parser_source"]
+        return
+
+    db.add(
+        ResumeParseResult(
+            resume_id=resume.id,
+            skills=parsed["skills"],
+            experience=parsed["experience"],
+            education=parsed["education"],
+            entities=parsed["entities"],
+            parser_source=parsed["parser_source"],
+        )
     )
 
 
