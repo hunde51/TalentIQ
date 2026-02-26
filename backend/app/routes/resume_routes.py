@@ -8,7 +8,7 @@ from app.schemas.resume_feedback_schema import ResumeFeedbackRequest, ResumeFeed
 from app.schemas.resume_parse_schema import ResumeParseResultResponse
 from app.schemas.resume_schema import ResumeUploadResponse
 from app.services.resume_feedback_service import generate_resume_feedback
-from app.services.resume_service import get_my_resume_parse_result, upload_resume
+from app.services.resume_service import get_my_latest_resume, get_my_resume_parse_result, upload_resume
 from app.tasks import enqueue_resume_feedback_generation
 
 
@@ -31,6 +31,14 @@ async def get_parsed_resume(
     db: AsyncSession = Depends(get_db),
 ) -> ResumeParseResultResponse:
     return await get_my_resume_parse_result(resume_id=resume_id, current_user=current_user, db=db)
+
+
+@router.get("/latest", response_model=ResumeUploadResponse)
+async def get_latest_resume(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ResumeUploadResponse:
+    return await get_my_latest_resume(current_user=current_user, db=db)
 
 
 @router.post("/feedback", response_model=ResumeFeedbackResponse)

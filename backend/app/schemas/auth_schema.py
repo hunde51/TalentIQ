@@ -9,13 +9,19 @@ class UserRole(str, Enum):
     admin = "admin"
 
 
+class SexType(str, Enum):
+    male = "male"
+    female = "female"
+
+
 class SignupRequest(BaseModel):
     username: str = Field(min_length=3, max_length=50)
     name: str = Field(min_length=2, max_length=120)
-    sex: str = Field(min_length=1, max_length=20)
+    sex: SexType
     age: int = Field(ge=13, le=120)
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
+    role: UserRole = UserRole.job_seeker
 
 
 class LoginRequest(BaseModel):
