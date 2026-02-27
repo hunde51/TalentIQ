@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.job_model import Job
 from app.models.user_model import User
-from app.schemas.job_schema import JobCreateRequest, JobListResponse, JobResponse
+from app.schemas.job_schema import JobCreateRequest, JobListResponse, JobResponse, JobUpdateRequest
 
 
 async def create_job_posting(payload: JobCreateRequest, current_user: User, db: AsyncSession) -> JobResponse:
@@ -76,9 +76,113 @@ async def list_jobs(
     location: str | None = None,
     q: str | None = None,
 ) -> JobListResponse:
+    return await _list_jobs_internal(
+        db=db,
+        recruiter_id=current_user.id if current_user.role == "recruiter" else None,
+        page=page,
+        size=size,
+        skill=skill,
+        location=location,
+        q=q,
+    )
+
+
+async def list_public_jobs(
+    db: AsyncSession,
+    page: int = 1,
+    size: int = 10,
+    skill: str | None = None,
+    location: str | None = None,
+    q: str | None = None,
+) -> JobListResponse:
+    return await _list_jobs_internal(
+        db=db,
+        recruiter_id=None,
+        page=page,
+        size=size,
+        skill=skill,
+        location=location,
+        q=q,
+    )
+
+
+async def update_job_posting(
+    *,
+    job_id: str,
+    payload: JobUpdateRequest,
+    current_user: User,
+    db: AsyncSession,
+) -> JobResponse:
+    job = await db.scalar(select(Job).where(Job.id == job_id))
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+
+    if current_user.role != "admin" and job.recruiter_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed to edit this job")
+
+    updates = payload.model_dump(exclude_unset=True)
+    if not updates:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No fields provided for update")
+
+    if "title" in updates:
+        updates["title"] = updates["title"].strip()
+    if "location" in updates:
+        updates["location"] = updates["location"].strip()
+    if "description" in updates:
+        updates["description"] = updates["description"].strip()
+    if "skills" in updates and updates["skills"] is not None:
+        updates["skills"] = _normalize_skills(updates["skills"])
+
+    for key, value in updates.items():
+        setattr(job, key, value)
+
+    await db.flush()
+
+    recruiter = await db.scalar(select(User).where(User.id == job.recruiter_id))
+    return JobResponse(
+        id=job.id,
+        recruiter_id=job.recruiter_id,
+        recruiter_name=recruiter.name if recruiter else None,
+        recruiter_username=recruiter.username if recruiter else None,
+        title=job.title,
+        description=job.description,
+        skills=job.skills,
+        location=job.location,
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+    )
+
+
+async def delete_job_posting(
+    *,
+    job_id: str,
+    current_user: User,
+    db: AsyncSession,
+) -> dict[str, str]:
+    job = await db.scalar(select(Job).where(Job.id == job_id))
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+
+    if current_user.role != "admin" and job.recruiter_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed to delete this job")
+
+    await db.delete(job)
+    await db.flush()
+    return {"message": "Job deleted"}
+
+
+async def _list_jobs_internal(
+    db: AsyncSession,
+    recruiter_id: str | None,
+    page: int = 1,
+    size: int = 10,
+    skill: str | None = None,
+    location: str | None = None,
+    q: str | None = None,
+) -> JobListResponse:
     filters = []
-    if current_user.role == "recruiter":
-        filters.append(Job.recruiter_id == current_user.id)
+    if recruiter_id:
+        filters.append(Job.recruiter_id == recruiter_id)
 
     if location:
         filters.append(func.lower(Job.location).contains(location.strip().lower()))

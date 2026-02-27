@@ -1,9 +1,13 @@
-from fastapi import HTTPException, status
+from pathlib import Path
+
+from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.models.application_model import Application
 from app.models.cover_letter_model import CoverLetter
+from app.models.job_model import Job
 from app.models.resume_model import Resume
 from app.models.resume_parse_model import ResumeParseResult
 from app.models.user_model import User
@@ -39,6 +43,70 @@ async def generate_cover_letter(
     await db.flush()
 
     return CoverLetterResponse.model_validate(entity)
+
+
+async def upload_cover_letter(
+    *,
+    resume_id: str,
+    job_description: str,
+    file: UploadFile,
+    current_user: User,
+    db: AsyncSession,
+) -> CoverLetterResponse:
+    resume = await db.scalar(select(Resume).where(Resume.id == resume_id, Resume.user_id == current_user.id))
+    if not resume:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume not found")
+
+    if not file.filename:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File name is required")
+
+    suffix = Path(file.filename).suffix.lower()
+    if suffix not in {".txt", ".md"}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only .txt or .md files are supported")
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file is not allowed")
+
+    if len(content) > 100_000:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Cover letter file too large")
+
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File must be UTF-8 text")
+
+    cleaned = text.strip()
+    if len(cleaned) < 20:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cover letter text is too short")
+
+    entity = CoverLetter(
+        user_id=current_user.id,
+        resume_id=resume.id,
+        job_description=job_description.strip() or "Uploaded by applicant",
+        generated_text=cleaned,
+        generator_source="uploaded",
+    )
+    db.add(entity)
+    await db.flush()
+    return CoverLetterResponse.model_validate(entity)
+
+
+async def get_cover_letter(
+    *,
+    cover_letter_id: str,
+    current_user: User,
+    db: AsyncSession,
+) -> CoverLetterResponse:
+    cover_letter = await db.scalar(select(CoverLetter).where(CoverLetter.id == cover_letter_id))
+    if not cover_letter:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cover letter not found")
+
+    allowed = await _can_access_cover_letter(cover_letter_id=cover_letter_id, owner_id=cover_letter.user_id, current_user=current_user, db=db)
+    if not allowed:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed to access this cover letter")
+
+    return CoverLetterResponse.model_validate(cover_letter)
 
 
 async def _parse_resume_on_demand(resume: Resume, db: AsyncSession) -> ResumeParseResult:
@@ -114,3 +182,27 @@ def _generate_with_hf(parsed: ResumeParseResult, job_description: str) -> str | 
         return output.strip() if output else None
     except Exception:
         return None
+
+
+async def _can_access_cover_letter(
+    *,
+    cover_letter_id: str,
+    owner_id: str,
+    current_user: User,
+    db: AsyncSession,
+) -> bool:
+    if current_user.role == "admin" or owner_id == current_user.id:
+        return True
+
+    if current_user.role != "recruiter":
+        return False
+
+    linked = await db.scalar(
+        select(Application.id)
+        .join(Job, Job.id == Application.job_id)
+        .where(
+            Application.cover_letter_id == cover_letter_id,
+            Job.recruiter_id == current_user.id,
+        )
+    )
+    return bool(linked)
