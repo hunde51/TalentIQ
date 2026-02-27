@@ -10,6 +10,13 @@ class JobCreateRequest(BaseModel):
     location: str = Field(min_length=2, max_length=255)
 
 
+class JobUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=2, max_length=255)
+    description: str | None = Field(default=None, min_length=20, max_length=5000)
+    skills: list[str] | None = Field(default=None, min_length=1, max_length=50)
+    location: str | None = Field(default=None, min_length=2, max_length=255)
+
+
 class JobResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

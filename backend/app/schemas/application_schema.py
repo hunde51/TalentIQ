@@ -13,6 +13,8 @@ class ApplicationStatus(str, Enum):
 class ApplicationCreateRequest(BaseModel):
     job_id: str
     user_id: str
+    resume_id: str | None = None
+    cover_letter_id: str | None = None
     status: ApplicationStatus = ApplicationStatus.applied
 
 
@@ -29,6 +31,8 @@ class ApplicationResponse(BaseModel):
     user_id: str
     applicant_name: str | None = None
     applicant_username: str | None = None
+    resume_id: str | None = None
+    cover_letter_id: str | None = None
     status: ApplicationStatus
     created_at: datetime
     updated_at: datetime
