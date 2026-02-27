@@ -3,7 +3,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.application_model import Application
+from app.models.cover_letter_model import CoverLetter
 from app.models.job_model import Job
+from app.models.resume_model import Resume
 from app.models.user_model import User
 from app.schemas.application_schema import (
     ApplicationCreateRequest,
@@ -27,9 +29,28 @@ async def create_application(payload: ApplicationCreateRequest, current_user: Us
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Application already exists for this job")
 
+    if payload.resume_id:
+        resume = await db.scalar(select(Resume).where(Resume.id == payload.resume_id, Resume.user_id == payload.user_id))
+        if not resume:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid resume_id for this user")
+
+    if payload.cover_letter_id:
+        cover_letter = await db.scalar(
+            select(CoverLetter).where(CoverLetter.id == payload.cover_letter_id, CoverLetter.user_id == payload.user_id)
+        )
+        if not cover_letter:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid cover_letter_id for this user")
+        if payload.resume_id and cover_letter.resume_id != payload.resume_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="cover_letter_id does not match resume_id",
+            )
+
     app_entity = Application(
         job_id=payload.job_id,
         user_id=payload.user_id,
+        resume_id=payload.resume_id,
+        cover_letter_id=payload.cover_letter_id,
         status=payload.status.value,
     )
     db.add(app_entity)
@@ -52,6 +73,8 @@ async def create_application(payload: ApplicationCreateRequest, current_user: Us
         user_id=app_entity.user_id,
         applicant_name=applicant_user.name,
         applicant_username=applicant_user.username,
+        resume_id=app_entity.resume_id,
+        cover_letter_id=app_entity.cover_letter_id,
         status=ApplicationStatus(app_entity.status),
         created_at=app_entity.created_at,
         updated_at=app_entity.updated_at,
@@ -94,6 +117,8 @@ async def update_application_status(
         user_id=app_entity.user_id,
         applicant_name=applicant.name if applicant else None,
         applicant_username=applicant.username if applicant else None,
+        resume_id=app_entity.resume_id,
+        cover_letter_id=app_entity.cover_letter_id,
         status=ApplicationStatus(app_entity.status),
         created_at=app_entity.created_at,
         updated_at=app_entity.updated_at,
@@ -137,6 +162,8 @@ async def list_applications(
             user_id=app_entity.user_id,
             applicant_name=applicant_name,
             applicant_username=applicant_username,
+            resume_id=app_entity.resume_id,
+            cover_letter_id=app_entity.cover_letter_id,
             status=ApplicationStatus(app_entity.status),
             created_at=app_entity.created_at,
             updated_at=app_entity.updated_at,
