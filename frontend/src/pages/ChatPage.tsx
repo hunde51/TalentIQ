@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
+const draftStorageKey = (userId: string | undefined, roomId: string) =>
+  `chat_draft:${userId || "anonymous"}:${roomId}`;
+const canUseStorage = typeof window !== "undefined";
+
 const ChatPage = () => {
   const { user } = useAuth();
   const [rooms, setRooms] = useState<ChatRoomItem[]>([]);
@@ -81,15 +85,68 @@ const ChatPage = () => {
     };
   }, [selectedRoom]);
 
+  useEffect(() => {
+    if (!selectedRoom) {
+      setDraft("");
+      return;
+    }
+    if (!canUseStorage) return;
+    const key = draftStorageKey(user?.id, selectedRoom);
+    const saved = localStorage.getItem(key);
+    setDraft(saved || "");
+  }, [selectedRoom, user?.id]);
+
+  useEffect(() => {
+    if (!selectedRoom || !canUseStorage) return;
+    const key = draftStorageKey(user?.id, selectedRoom);
+    if (!draft.trim()) {
+      localStorage.removeItem(key);
+      return;
+    }
+    localStorage.setItem(key, draft);
+  }, [draft, selectedRoom, user?.id]);
+
   const selectedRoomInfo = useMemo(
     () => rooms.find((r) => r.application_id === selectedRoom),
     [rooms, selectedRoom],
   );
+  const senderSideMap = useMemo(() => {
+    const ids = Array.from(new Set(messages.map((m) => m.sender_id)));
+    const map = new Map<string, "left" | "right">();
+    if (ids.length === 0) return map;
+
+    // Always prefer current user on the right when present.
+    if (user?.id && ids.includes(user.id)) {
+      map.set(user.id, "right");
+      const otherIds = ids.filter((id) => id !== user.id);
+      if (otherIds[0]) map.set(otherIds[0], "left");
+      for (const id of otherIds.slice(1)) {
+        map.set(id, "left");
+      }
+      return map;
+    }
+
+    // Fallback deterministic side split from observed senders.
+    map.set(ids[0], "left");
+    if (ids[1]) map.set(ids[1], "right");
+    for (const id of ids.slice(2)) {
+      map.set(id, "left");
+    }
+    return map;
+  }, [messages, user?.id]);
+  const formatMessageTime = (value: string) =>
+    new Date(value).toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    });
 
   const sendMessage = () => {
     const content = draft.trim();
     if (!content || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
     wsRef.current.send(JSON.stringify({ content }));
+    if (canUseStorage) {
+      localStorage.removeItem(draftStorageKey(user?.id, selectedRoom));
+    }
     setDraft("");
   };
 
@@ -110,7 +167,9 @@ const ChatPage = () => {
                 }`}
               >
                 <p className="font-medium">{room.job_title}</p>
-                <p className="text-xs text-muted-foreground">App: {room.application_id.slice(0, 8)}...</p>
+                <p className="text-xs text-muted-foreground">
+                  Applicant: {room.applicant_name || room.applicant_username || room.applicant_id}
+                </p>
               </button>
             ))}
             {rooms.length === 0 && <p className="text-sm text-muted-foreground">No chat rooms yet.</p>}
@@ -121,19 +180,33 @@ const ChatPage = () => {
           <div className="border-b border-border pb-3 mb-3">
             <p className="font-semibold">{selectedRoomInfo?.job_title || "Select a room"}</p>
             {selectedRoomInfo && (
-              <p className="text-xs text-muted-foreground">application_id: {selectedRoomInfo.application_id}</p>
+              <p className="text-xs text-muted-foreground">
+                Applicant: {selectedRoomInfo.applicant_name || selectedRoomInfo.applicant_username || selectedRoomInfo.applicant_id}
+              </p>
             )}
           </div>
 
           <div className="flex-1 overflow-y-auto space-y-2 pr-1">
             {messages.map((message) => {
+              const rightAligned = senderSideMap.get(message.sender_id) === "right";
               const mine = user?.id === message.sender_id;
               return (
-                <div key={message.id} className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${mine ? "ml-auto bg-primary text-primary-foreground" : "bg-muted"}`}>
-                  <p>{message.content}</p>
-                  <p className={`text-[10px] mt-1 ${mine ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
-                    {new Date(message.created_at).toLocaleTimeString()}
-                  </p>
+                <div key={message.id} className={`w-full flex ${rightAligned ? "justify-end" : "justify-start"}`}>
+                  <div
+                    className={`max-w-[82%] rounded-xl px-3 py-2 text-sm shadow-sm ${
+                      rightAligned ? "bg-primary text-primary-foreground" : "bg-muted"
+                    }`}
+                  >
+                    {!mine && (
+                      <p className={`text-[10px] mb-1 ${rightAligned ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
+                        {message.sender_name || message.sender_username || message.sender_id}
+                      </p>
+                    )}
+                    <p className="leading-relaxed whitespace-pre-wrap break-words">{message.content}</p>
+                    <p className={`text-[10px] mt-1 ${rightAligned ? "text-primary-foreground/80 text-right" : "text-muted-foreground"}`}>
+                      {formatMessageTime(message.created_at)}
+                    </p>
+                  </div>
                 </div>
               );
             })}
