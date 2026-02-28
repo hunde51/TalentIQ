@@ -1,139 +1,109 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { UserRole } from "@/data/mockData";
-import { Sparkles, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, LockKeyhole, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import { api } from "@/lib/api";
 
 const AuthPage = () => {
-  const [isLogin, setIsLogin] = useState(true);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("alex@example.com");
-  const [password, setPassword] = useState("password");
-  const [role, setRole] = useState<UserRole>("job_seeker");
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const { login, signup } = useAuth();
+  const [submitting, setSubmitting] = useState(false);
+  const { login, logout } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isLogin) {
-      login(email, password, role);
-    } else {
-      signup(name, email, password, role);
+    setSubmitting(true);
+    try {
+      await login(identifier, password);
+      const me = await api.me();
+      if (me.role !== "admin") {
+        logout();
+        toast.error("Only admins can use this login page.");
+        return;
+      }
+      toast.success("Admin signed in");
+      navigate("/admin/dashboard");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Authentication failed");
+    } finally {
+      setSubmitting(false);
     }
-    navigate("/dashboard");
   };
 
-  const roles: { value: UserRole; label: string; desc: string }[] = [
-    { value: "job_seeker", label: "Job Seeker", desc: "Find your dream job" },
-    { value: "recruiter", label: "Recruiter", desc: "Hire top talent" },
-    { value: "admin", label: "Admin", desc: "Manage the platform" },
-  ];
-
   return (
-    <div className="min-h-screen flex">
-      {/* Left panel */}
-      <div className="hidden lg:flex lg:w-1/2 gradient-hero items-center justify-center p-12 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-20 w-72 h-72 rounded-full bg-accent blur-3xl" />
-          <div className="absolute bottom-20 right-20 w-96 h-96 rounded-full bg-primary blur-3xl" />
-        </div>
-        <div className="relative z-10 text-center max-w-md">
-          <div className="w-16 h-16 rounded-2xl gradient-accent flex items-center justify-center mx-auto mb-8">
-            <Sparkles className="w-8 h-8 text-accent-foreground" />
+    <div className="min-h-screen bg-slate-100 text-slate-900">
+      <div className="mx-auto flex min-h-screen max-w-5xl items-center justify-center p-6 sm:p-10">
+        <div className="w-full max-w-md rounded-xl border border-slate-300 bg-white p-7 shadow-sm sm:p-9">
+          <div className="mb-8 border-b border-slate-200 pb-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-500">Talent Intelligence</p>
+            <h2 className="mt-2 text-3xl font-semibold text-slate-900">Admin Login</h2>
+            <p className="mt-2 text-sm text-slate-600">Restricted access for platform administrators.</p>
           </div>
-          <h1 className="text-4xl font-bold text-primary-foreground mb-4">
-            AI-Powered Career Intelligence
-          </h1>
-          <p className="text-primary-foreground/70 text-lg leading-relaxed">
-            Smart resume parsing, intelligent job matching, and data-driven hiring decisions — all in one platform.
-          </p>
-        </div>
-      </div>
-
-      {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="w-full max-w-md">
-          <div className="flex items-center gap-2.5 mb-8 lg:hidden">
-            <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="font-bold text-xl text-foreground">ResumeAI</span>
-          </div>
-
-          <h2 className="text-2xl font-bold text-foreground">
-            {isLogin ? "Welcome back" : "Create account"}
-          </h2>
-          <p className="text-muted-foreground mt-1 mb-8">
-            {isLogin ? "Sign in to your account" : "Get started for free"}
-          </p>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Role selector */}
-            <div className="grid grid-cols-3 gap-2">
-              {roles.map((r) => (
-                <button
-                  key={r.value}
-                  type="button"
-                  onClick={() => setRole(r.value)}
-                  className={`p-3 rounded-lg border text-center transition-all duration-150 ${
-                    role === r.value
-                      ? "border-primary bg-primary/5 text-primary"
-                      : "border-border text-muted-foreground hover:border-primary/30"
-                  }`}
-                >
-                  <p className="text-sm font-semibold">{r.label}</p>
-                  <p className="text-[10px] mt-0.5 opacity-70">{r.desc}</p>
-                </button>
-              ))}
-            </div>
-
-            {!isLogin && (
-              <div>
-                <Label htmlFor="name">Full Name</Label>
-                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Alex Johnson" className="mt-1.5" />
-              </div>
-            )}
-
             <div>
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" className="mt-1.5" />
-            </div>
-
-            <div>
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="identifier" className="text-xs uppercase tracking-wide text-slate-600">
+                Username or Email
+              </Label>
               <div className="relative mt-1.5">
+                <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Input
+                  id="identifier"
+                  type="text"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  placeholder="admin username or email"
+                  className="h-11 border-slate-300 bg-white pl-10 text-slate-900 placeholder:text-slate-400 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-slate-900"
+                  autoComplete="username"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="password" className="text-xs uppercase tracking-wide text-slate-600">
+                Password
+              </Label>
+              <div className="relative mt-1.5">
+                <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="Enter password"
+                  minLength={8}
+                  className="h-11 border-slate-300 bg-white pl-10 pr-10 text-slate-900 placeholder:text-slate-400 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-slate-900"
+                  autoComplete="current-password"
+                  required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 transition-colors hover:text-slate-700"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </div>
 
-            <Button type="submit" className="w-full h-11 font-semibold">
-              {isLogin ? "Sign In" : "Create Account"}
+            <Button
+              type="submit"
+              className="h-11 w-full rounded-md bg-sky-600 font-semibold text-white hover:bg-sky-700"
+              disabled={submitting}
+            >
+              {submitting ? "Signing in..." : "Login as Admin"}
             </Button>
           </form>
 
-          <p className="text-center text-sm text-muted-foreground mt-6">
-            {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
-            <button onClick={() => setIsLogin(!isLogin)} className="text-primary font-semibold hover:underline">
-              {isLogin ? "Sign up" : "Sign in"}
-            </button>
-          </p>
+          <p className="mt-5 text-center text-xs text-slate-500">Job Seeker / Recruiter? Use /login</p>
         </div>
       </div>
     </div>
