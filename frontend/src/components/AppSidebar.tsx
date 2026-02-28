@@ -34,6 +34,7 @@ const sidebarLinks = {
   ],
   recruiter: [
     { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+    { to: "/recruiter/jobs", icon: Briefcase, label: "Job" },
     { to: "/post-job", icon: PlusCircle, label: "Post Job" },
     { to: "/applicants", icon: Users, label: "Applicants" },
     { to: "/analytics", icon: BarChart3, label: "Analytics" },
