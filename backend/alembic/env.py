@@ -7,7 +7,18 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.core.config import get_settings
 from app.core.database import Base
-from app.models import Resume, ResumeParseResult, User  # noqa: F401
+from app.models import (  # noqa: F401
+    Application,
+    AuditLog,
+    ChatMessage,
+    CoverLetter,
+    Job,
+    JobMatchResult,
+    Resume,
+    ResumeFeedback,
+    ResumeParseResult,
+    User,
+)
 
 config = context.config
 
