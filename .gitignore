@@ -167,3 +167,16 @@ backend/.env
 backend/.env.*
 frontend/.env
 frontend/.env.*
+deploy/.env
+deploy/.env.*
+
+# ------------------------------
+# Deployment secrets / certs
+# ------------------------------
+**/certs/
+**/secrets/
+*.ovpn
+*.kubeconfig
+*.tfvars
+*.tfstate
+*.tfstate.*
